@@ -46,6 +46,21 @@ PORT=3333 npm run start:http
 
 The server listens at `http://localhost:3333/mcp`.
 
+## Connect ChatGPT to a local MCP server
+
+1. Start the MCP server locally (HTTP mode):
+   ```bash
+   export MARS_API_KEY="your_api_key"
+   npm install
+   npm run build
+   PORT=3333 npm run start:http
+   ```
+2. In ChatGPT, open **Settings → Connectors → MCP Servers** (or **Settings → Developer → MCP Servers**).
+3. Add a new MCP server with:
+   - **Name**: USDA MARS MCP (or any label)
+   - **Server URL**: `http://localhost:3333/mcp`
+4. Save, then start a new chat and enable the server when prompted.
+
 ## MCP tools
 
 ### `mars_healthcheck`
