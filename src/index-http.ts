@@ -1,75 +1,47 @@
-import http from "node:http";
-import { createLogger } from "./util/logger";
-import { loadConfig } from "./util/config";
-import { MarsClient } from "./mars/client";
-import { callTool, marsTools } from "./mcp/tools";
+import { createServer } from "node:http";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { loadConfig } from "./util/config.js";
+import { logger } from "./util/logger.js";
+import { MarsClient } from "./mars/client.js";
+import { registerTools } from "./mcp/tools.js";
 
-interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id?: string | number | null;
-  method: string;
-  params?: Record<string, unknown>;
-}
-
-const logger = createLogger({ name: "mars-mcp-http" });
-const config = loadConfig();
-const client = new MarsClient({ config, logger });
-
-const server = http.createServer((req, res) => {
-  if (req.method !== "POST" || req.url !== "/rpc") {
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Not Found" }));
-    return;
+async function main() {
+  const config = await loadConfig();
+  if (!config) {
+    logger.error("Missing MARS API key. Set MARS_API_KEY or ~/.mars-mcp/config.json.");
+    process.exit(1);
   }
 
-  let body = "";
-  req.on("data", (chunk) => {
-    body += chunk;
-  });
-  req.on("end", async () => {
-    try {
-      const request = JSON.parse(body) as JsonRpcRequest;
-      let result: unknown;
-
-      switch (request.method) {
-        case "initialize":
-          result = { capabilities: { tools: {} } };
-          break;
-        case "tools/list":
-          result = { tools: marsTools };
-          break;
-        case "tools/call": {
-          const { name, arguments: args } = request.params ?? {};
-          if (typeof name !== "string") {
-            throw new Error("Tool name must be a string.");
-          }
-          result = await callTool(name, (args ?? {}) as Record<string, unknown>, client);
-          break;
-        }
-        default:
-          throw new Error(`Unsupported method: ${request.method}`);
+  const server = new Server(
+    {
+      name: "mars-mcp-server",
+      version: "0.1.0"
+    },
+    {
+      capabilities: {
+        tools: {}
       }
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ jsonrpc: "2.0", id: request.id ?? null, result }));
-    } catch (error) {
-      logger.error("HTTP RPC error", { error });
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: null,
-          error: {
-            code: -32000,
-            message: error instanceof Error ? error.message : "Unknown error",
-          },
-        }),
-      );
     }
-  });
-});
+  );
 
-const port = Number(process.env.PORT ?? 3000);
-server.listen(port, () => {
-  logger.info("HTTP server listening", { port });
+  const client = new MarsClient(config.apiKey);
+  registerTools(server, client);
+
+  const transport = new StreamableHTTPServerTransport({ endpoint: "/mcp" });
+  await server.connect(transport);
+
+  const port = Number(process.env.PORT ?? 3333);
+  const httpServer = createServer((req, res) => {
+    transport.handleRequest(req, res);
+  });
+
+  httpServer.listen(port, () => {
+    logger.info(`MARS MCP server listening on http://localhost:${port}/mcp`);
+  });
+}
+
+main().catch((error) => {
+  logger.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
 });

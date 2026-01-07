@@ -1,69 +1,33 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
-export interface Logger {
-  debug(message: string, meta?: Record<string, unknown>): void;
-  info(message: string, meta?: Record<string, unknown>): void;
-  warn(message: string, meta?: Record<string, unknown>): void;
-  error(message: string, meta?: Record<string, unknown>): void;
+const levelWeight: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40
+};
+
+const configuredLevel = (process.env.LOG_LEVEL as LogLevel | undefined) ?? "info";
+
+function shouldLog(level: LogLevel): boolean {
+  return levelWeight[level] >= levelWeight[configuredLevel];
 }
 
-export interface LoggerOptions {
-  name: string;
-  stream?: NodeJS.WritableStream;
+function write(message: string): void {
+  process.stderr.write(`${message}\n`);
 }
 
-const defaultStream = process.stderr;
-
-function serializeError(value: unknown): Record<string, unknown> | undefined {
-  if (!(value instanceof Error)) {
-    return undefined;
+export const logger = {
+  debug(message: string): void {
+    if (shouldLog("debug")) write(`[debug] ${message}`);
+  },
+  info(message: string): void {
+    if (shouldLog("info")) write(`[info] ${message}`);
+  },
+  warn(message: string): void {
+    if (shouldLog("warn")) write(`[warn] ${message}`);
+  },
+  error(message: string): void {
+    if (shouldLog("error")) write(`[error] ${message}`);
   }
-
-  return {
-    name: value.name,
-    message: value.message,
-    stack: value.stack,
-  };
-}
-
-function writeLog(
-  stream: NodeJS.WritableStream,
-  name: string,
-  level: LogLevel,
-  message: string,
-  meta?: Record<string, unknown>,
-): void {
-  const payload: Record<string, unknown> = {
-    time: new Date().toISOString(),
-    level,
-    name,
-    message,
-  };
-
-  if (meta) {
-    payload.meta = meta;
-    const errorMeta = serializeError(meta.error);
-    if (errorMeta) {
-      payload.error = errorMeta;
-    }
-  }
-
-  stream.write(`${JSON.stringify(payload)}\n`);
-}
-
-export function createLogger({ name, stream = defaultStream }: LoggerOptions): Logger {
-  return {
-    debug(message, meta) {
-      writeLog(stream, name, "debug", message, meta);
-    },
-    info(message, meta) {
-      writeLog(stream, name, "info", message, meta);
-    },
-    warn(message, meta) {
-      writeLog(stream, name, "warn", message, meta);
-    },
-    error(message, meta) {
-      writeLog(stream, name, "error", message, meta);
-    },
-  };
-}
+};

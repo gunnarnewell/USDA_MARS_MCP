@@ -1,38 +1,36 @@
 export interface RetryOptions {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs?: number;
-  retryOn?: (error: unknown) => boolean;
+  retries: number;
+  minDelayMs: number;
+  maxDelayMs: number;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function nextDelay(attempt: number, baseDelayMs: number, maxDelayMs?: number): number {
-  const delay = baseDelayMs * Math.pow(2, attempt);
-  const capped = maxDelayMs ? Math.min(delay, maxDelayMs) : delay;
-  const jitter = Math.floor(Math.random() * baseDelayMs);
-  return capped + jitter;
-}
-
-export async function withRetry<T>(
-  operation: (attempt: number) => Promise<T>,
-  { maxRetries, baseDelayMs, maxDelayMs, retryOn }: RetryOptions,
+export async function retryWithBackoff<T>(
+  fn: (attempt: number) => Promise<T>,
+  options: RetryOptions,
+  shouldRetry: (error: unknown) => boolean
 ): Promise<T> {
   let attempt = 0;
+  let lastError: unknown;
 
-  while (true) {
+  while (attempt <= options.retries) {
     try {
-      return await operation(attempt);
+      return await fn(attempt);
     } catch (error) {
-      if (attempt >= maxRetries || (retryOn && !retryOn(error))) {
-        throw error;
+      lastError = error;
+      if (attempt === options.retries || !shouldRetry(error)) {
+        break;
       }
 
-      const delay = nextDelay(attempt, baseDelayMs, maxDelayMs);
-      await sleep(delay);
+      const baseDelay = Math.min(
+        options.maxDelayMs,
+        options.minDelayMs * 2 ** attempt
+      );
+      const jitter = Math.random() * baseDelay * 0.2;
+      const delay = baseDelay + jitter;
+      await new Promise((resolve) => setTimeout(resolve, delay));
       attempt += 1;
     }
   }
+
+  throw lastError;
 }
