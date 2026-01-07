@@ -1,14 +1,16 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json tsconfig.json ./
+
+COPY package.json package-lock.json* ./
 RUN npm install
+
+COPY tsconfig.json ./
 COPY src ./src
+
 RUN npm run build
 
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY package.json ./package.json
-RUN npm install --omit=dev
-EXPOSE 3000
+ENV PORT=3333
+EXPOSE 3333
+
 CMD ["node", "dist/index-http.js"]

@@ -1,19 +1,28 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 export interface MarsConfig {
-  baseUrl: string;
-  apiKey?: string;
-  timeoutMs: number;
-  maxRetries: number;
-  retryBaseDelayMs: number;
-  concurrency: number;
+  apiKey: string;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): MarsConfig {
-  return {
-    baseUrl: env.MARS_BASE_URL ?? "https://api.nasa.gov/mars-photos/api/v1/",
-    apiKey: env.MARS_API_KEY,
-    timeoutMs: Number(env.MARS_TIMEOUT_MS ?? 15000),
-    maxRetries: Number(env.MARS_MAX_RETRIES ?? 2),
-    retryBaseDelayMs: Number(env.MARS_RETRY_BASE_DELAY_MS ?? 250),
-    concurrency: Number(env.MARS_CONCURRENCY ?? 4),
-  };
+const CONFIG_PATH = join(homedir(), ".mars-mcp", "config.json");
+
+export async function loadConfig(): Promise<MarsConfig | null> {
+  const envKey = process.env.MARS_API_KEY?.trim();
+  if (envKey) {
+    return { apiKey: envKey };
+  }
+
+  try {
+    const raw = await readFile(CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { apiKey?: string };
+    if (parsed.apiKey?.trim()) {
+      return { apiKey: parsed.apiKey.trim() };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }

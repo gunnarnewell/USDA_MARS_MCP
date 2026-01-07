@@ -1,64 +1,121 @@
-# USDA MARS MCP
+# USDA AMS MARS MCP Server
 
-A TypeScript Model Context Protocol (MCP) server that proxies NASA MARS requests with retries, timeouts, structured errors, and configurable concurrency.
+Self-hostable MCP server for the USDA AMS MARS (MyMarketNews) API. Supports STDIO and streamable HTTP modes.
 
-## Features
-
-- **Transports**: STDIO (`src/index-stdio.ts`) and HTTP (`src/index-http.ts`).
-- **Tools**: `mars.get` for MARS API access, `mars.health` for readiness.
-- **Authentication**: Bearer token via `MARS_API_KEY`.
-- **Resilience**: retries with exponential backoff + jitter and request timeouts.
-- **Concurrency limits**: in-flight requests capped by `MARS_CONCURRENCY`.
-- **Structured errors**: `MarsError` captures status, code, and details.
+## Get an API key
+Request an API key from USDA AMS MARS (MyMarketNews) and keep it private.
 
 ## Configuration
 
-| Variable | Description | Default |
-| --- | --- | --- |
-| `MARS_BASE_URL` | Base URL for the MARS API | `https://api.nasa.gov/mars-photos/api/v1/` |
-| `MARS_API_KEY` | API key for authentication | `undefined` |
-| `MARS_TIMEOUT_MS` | Timeout per request | `15000` |
-| `MARS_MAX_RETRIES` | Retries for retryable errors | `2` |
-| `MARS_RETRY_BASE_DELAY_MS` | Base backoff delay | `250` |
-| `MARS_CONCURRENCY` | Max concurrent requests | `4` |
+Preferred: set the environment variable.
 
-## Development
+```bash
+export MARS_API_KEY="your_api_key"
+```
+
+Or use `~/.mars-mcp/config.json`:
+
+```json
+{
+  "apiKey": "your_api_key"
+}
+```
+
+Environment variables take precedence.
+
+## Install & build
 
 ```bash
 npm install
 npm run build
 ```
 
-## STDIO mode
+## Run (STDIO)
+
+```bash
+npm run start
+```
 
 STDIO mode logs only to stderr.
 
-```bash
-node dist/index-stdio.js
-```
-
-Send JSON-RPC requests over stdin, for example:
-
-```json
-{"jsonrpc":"2.0","id":1,"method":"tools/list"}
-```
-
-## HTTP mode
+## Run (HTTP)
 
 ```bash
-node dist/index-http.js
+PORT=3333 npm run start:http
 ```
 
-POST JSON-RPC requests to `/rpc`:
+The server listens at `http://localhost:3333/mcp`.
+
+## MCP tools
+
+### `mars_healthcheck`
+Calls `GET /reports`.
 
 ```bash
-curl -X POST http://localhost:3000/rpc \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/reports"
 ```
 
-## Docker
+### `mars_list_reports`
+Calls `GET /reports`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/reports"
+```
+
+### `mars_get_report`
+Calls `GET /reports/{slug}` with optional `q`, `sort`, `allSections`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/reports/REPORT_SLUG?q=commodity=Feeder%20Cattle&sort=-report_date&allSections=true"
+```
+
+### `mars_get_report_section`
+Calls `GET /reports/{slug}/{section}` with optional `q`, `sort`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/reports/REPORT_SLUG/SECTION_NAME"
+```
+
+### `mars_get_report_details`
+Calls `GET /reports/{slug}/Details` with optional `correctionsOnly`, `anyChangesSince`, `lastDays`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/reports/REPORT_SLUG/Details?correctionsOnly=true&anyChangesSince=2024/01/01&lastDays=50"
+```
+
+### `mars_list_offices`
+Calls `GET /offices`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/offices"
+```
+
+### `mars_list_market_types`
+Calls `GET /marketTypes`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/marketTypes"
+```
+
+### `mars_list_commodities`
+Calls `GET /commodities`.
+
+```bash
+curl -u "${MARS_API_KEY}:" \
+  "https://marsapi.ams.usda.gov/services/v1.2/commodities"
+```
+
+## Docker (HTTP mode)
 
 ```bash
 docker compose up --build
 ```
+
+The container exposes port 3333 and serves the MCP HTTP endpoint at `/mcp`.
