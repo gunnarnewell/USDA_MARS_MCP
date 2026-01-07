@@ -1,0 +1,12 @@
+services:
+  mars-mcp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MARS_BASE_URL: "https://api.nasa.gov/mars-photos/api/v1/"
+      MARS_API_KEY: "${MARS_API_KEY}"
+      MARS_TIMEOUT_MS: "15000"
+      MARS_MAX_RETRIES: "2"
+      MARS_RETRY_BASE_DELAY_MS: "250"
+      MARS_CONCURRENCY: "4"
