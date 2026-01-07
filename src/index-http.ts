@@ -27,7 +27,7 @@ async function main() {
   const client = new MarsClient(apiKey);
   registerTools(server, client);
 
-  const transport = new StreamableHTTPServerTransport({ endpoint: "/mcp" });
+  const transport = new StreamableHTTPServerTransport();
   await server.connect(transport);
 
   const portValue = process.env.PORT?.trim();
