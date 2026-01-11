@@ -30,7 +30,8 @@ describe("MarsClient", () => {
           return { statusCode: 429, data: { error: "rate limit" } };
         }
         return { statusCode: 200, data: [{ slug_id: "1", slug_name: "abc", report_name: "Report" }] };
-      });
+      })
+      .persist();
 
     const response = await client.getJson("/reports");
     expect(response.status).toBe(200);
