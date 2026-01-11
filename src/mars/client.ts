@@ -80,7 +80,8 @@ export class MarsClient {
           });
 
           const bodyText = await response.body.text();
-          const contentType = response.headers["content-type"];
+          const header = response.headers["content-type"];
+          const contentType = Array.isArray(header) ? header[0] : header;
           const parsedBody = this.parseBody(bodyText, contentType);
 
           if (response.statusCode >= 400) {
