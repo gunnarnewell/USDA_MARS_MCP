@@ -16,4 +16,9 @@ describe("buildQuery", () => {
     const query = buildQuery({ correctionsOnly: true });
     expect(query).toBe("?correctionsOnly=true");
   });
+
+  it("includes lastReports when provided", () => {
+    const query = buildQuery({ lastReports: 4, q: "commodity=Apples" });
+    expect(query).toBe("?q=commodity%3DApples&lastReports=4");
+  });
 });
