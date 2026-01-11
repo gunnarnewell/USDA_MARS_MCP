@@ -4,11 +4,6 @@ import { join } from "node:path";
 
 export interface MarsConfig {
   apiKey: string;
-  baseUrl?: string;
-  timeoutMs?: number;
-  maxRetries?: number;
-  retryBaseDelayMs?: number;
-  concurrency?: number;
 }
 
 const CONFIG_PATH = join(homedir(), ".mars-mcp", "config.json");
