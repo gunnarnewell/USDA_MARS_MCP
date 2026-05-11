@@ -31,4 +31,38 @@ describe("MarsClient retry behavior", () => {
     expect(result.data.ok).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
+
+  it("caches discovery endpoint responses", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify([{ slug_id: "1" }]), { status: 200 }));
+
+    const client = new MarsClient({
+      config: { ...config, cacheTtlMs: 1000 },
+      logger: createLogger({ name: "test", stream: process.stderr }),
+      fetcher,
+    });
+
+    await client.request("/reports");
+    await client.request("/reports");
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("can disable discovery endpoint caching", async () => {
+    const fetcher = vi
+      .fn()
+      .mockImplementation(async () => new Response(JSON.stringify([{ slug_id: "1" }]), { status: 200 }));
+
+    const client = new MarsClient({
+      config: { ...config, cacheTtlMs: 0 },
+      logger: createLogger({ name: "test", stream: process.stderr }),
+      fetcher,
+    });
+
+    await client.request("/reports");
+    await client.request("/reports");
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

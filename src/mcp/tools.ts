@@ -109,9 +109,8 @@ function normalizeError(error: unknown) {
   };
 }
 
-export function registerTools(server: Server, client: MarsClient): void {
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
+export function listMarsTools() {
+  return [
       {
         name: "mars_healthcheck",
         description: "Check connectivity to the MARS reports endpoint",
@@ -221,7 +220,12 @@ export function registerTools(server: Server, client: MarsClient): void {
         description: "List MARS commodities",
         inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       }
-    ]
+  ];
+}
+
+export function registerTools(server: Server, client: MarsClient): void {
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: listMarsTools()
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {

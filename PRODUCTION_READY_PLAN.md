@@ -4,6 +4,26 @@
 
 Bring this MCP server up to date and make it reliable enough for local/internal use plus a single-user Railway deployment exposed over the internet. The improved server should remain generic and reusable, so future Codex/ChatGPT skills can pull data from specific USDA AMS MARS reports by using shared report-discovery, filtering, and data-fetching tools rather than requiring a custom MCP tool for every report.
 
+## Current Status
+
+Implemented:
+
+- Dependency refresh for the MCP SDK and Node 22-compatible local toolchain.
+- Lockfile creation and repository ignores for local dependencies, build output, env files, and local MARS config.
+- Shared MCP server factory for stdio and HTTP entry points.
+- HTTP routing for `/mcp`, `/healthz`, unknown-route `404`, optional `MCP_AUTH_TOKEN`, stateless per-request transport, and graceful shutdown.
+- Unified client request path with injectable fetch, retry handling, config validation, and TTL cache for low-change discovery endpoints.
+- Standardized tool success/error envelopes while preserving existing `data` fields.
+- Optional conservative normalization for `mars_get_report_data`.
+- Skill authoring documentation in `docs/SKILL_AUTHORING.md`.
+- Tests for config parsing, HTTP routing/auth, tool definitions, normalization, retry behavior, cache behavior, and URL utilities.
+
+Remaining:
+
+- Live USDA smoke test with a real `MARS_API_KEY`.
+- Deployment-specific verification for Railway or another public host.
+- Optional report-specific skills for known high-value reports.
+
 Chosen defaults:
 
 - Deployment target: local/internal first, with practical hardening for a personally hosted Railway endpoint.
