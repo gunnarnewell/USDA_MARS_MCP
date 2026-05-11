@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { MarsClient, MarsError } from "../mars/client.js";
+import { normalizeReportData } from "../mars/normalize.js";
 
 const listReportsSchema = z.object({}).strict();
 const getReportSchema = z.object({
@@ -15,7 +16,10 @@ const getReportDataSchema = z.object({
   q: z.string().optional(),
   sort: z.string().optional(),
   allSections: z.boolean().optional(),
-  lastReports: z.number().int().positive().optional()
+  lastReports: z.number().int().positive().max(1000).optional(),
+  normalize: z.boolean().optional(),
+  includeRaw: z.boolean().optional(),
+  maxRows: z.number().int().positive().max(10000).optional()
 });
 const getSectionSchema = z.object({
   slug: z.string().min(1),
@@ -26,8 +30,8 @@ const getSectionSchema = z.object({
 const getDetailsSchema = z.object({
   slug: z.string().min(1),
   correctionsOnly: z.boolean().optional(),
-  anyChangesSince: z.string().optional(),
-  lastDays: z.number().int().positive().optional()
+  anyChangesSince: z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/).optional(),
+  lastDays: z.number().int().positive().max(3660).optional()
 });
 const getColumnsSchema = z.object({
   slug: z.string().min(1)
@@ -74,6 +78,14 @@ function toolResult(payload: unknown, isError = false) {
   } as const;
 }
 
+function successResult(payload: Record<string, unknown>) {
+  return toolResult({ ok: true, ...payload });
+}
+
+function errorResult(payload: Record<string, unknown>) {
+  return toolResult({ ok: false, ...payload }, true);
+}
+
 function normalizeError(error: unknown) {
   if (error instanceof MarsError) {
     return {
@@ -81,6 +93,13 @@ function normalizeError(error: unknown) {
       message: error.message,
       details: error.details,
       http_status: error.httpStatus
+    };
+  }
+  if (error instanceof z.ZodError) {
+    return {
+      error_code: "invalid_input",
+      message: "Invalid tool input",
+      details: error.issues
     };
   }
   return {
@@ -96,12 +115,12 @@ export function registerTools(server: Server, client: MarsClient): void {
       {
         name: "mars_healthcheck",
         description: "Check connectivity to the MARS reports endpoint",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+        inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       },
       {
         name: "mars_list_reports",
         description: "List MARS reports table of contents",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+        inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       },
       {
         name: "mars_get_report",
@@ -109,10 +128,10 @@ export function registerTools(server: Server, client: MarsClient): void {
         inputSchema: {
           type: "object",
           properties: {
-            slug: { type: "string" },
-            q: { type: "string" },
-            sort: { type: "string" },
-            allSections: { type: "boolean" }
+            slug: { type: "string", description: "MARS report slug from mars_list_reports." },
+            q: { type: "string", description: "Report-specific MARS query expression. Inspect columns before use." },
+            sort: { type: "string", description: "Report-specific MARS sort expression, such as -report_date when supported." },
+            allSections: { type: "boolean", description: "Request all report sections when supported by MARS." }
           },
           required: ["slug"],
           additionalProperties: false
@@ -124,11 +143,14 @@ export function registerTools(server: Server, client: MarsClient): void {
         inputSchema: {
           type: "object",
           properties: {
-            slug: { type: "string" },
-            q: { type: "string" },
-            sort: { type: "string" },
-            allSections: { type: "boolean" },
-            lastReports: { type: "number" }
+            slug: { type: "string", description: "MARS report slug from mars_list_reports." },
+            q: { type: "string", description: "Report-specific MARS query expression. Inspect columns before use." },
+            sort: { type: "string", description: "Report-specific MARS sort expression, such as -report_date when supported." },
+            allSections: { type: "boolean", description: "Request all report sections when supported by MARS." },
+            lastReports: { type: "number", minimum: 1, maximum: 1000 },
+            normalize: { type: "boolean", description: "When true, return conservative normalized rows plus source metadata." },
+            includeRaw: { type: "boolean", description: "When normalize is true, include the original MARS response. Defaults to true." },
+            maxRows: { type: "number", minimum: 1, maximum: 10000, description: "Optional maximum number of normalized rows to return." }
           },
           required: ["slug"],
           additionalProperties: false
@@ -140,10 +162,10 @@ export function registerTools(server: Server, client: MarsClient): void {
         inputSchema: {
           type: "object",
           properties: {
-            slug: { type: "string" },
-            section: { type: "string" },
-            q: { type: "string" },
-            sort: { type: "string" }
+            slug: { type: "string", description: "MARS report slug from mars_list_reports." },
+            section: { type: "string", description: "Report section name to fetch." },
+            q: { type: "string", description: "Report-specific MARS query expression. Inspect columns before use." },
+            sort: { type: "string", description: "Report-specific MARS sort expression, such as -report_date when supported." }
           },
           required: ["slug", "section"],
           additionalProperties: false
@@ -154,7 +176,7 @@ export function registerTools(server: Server, client: MarsClient): void {
         description: "List available columns for a report",
         inputSchema: {
           type: "object",
-          properties: { slug: { type: "string" } },
+          properties: { slug: { type: "string", description: "MARS report slug from mars_list_reports." } },
           required: ["slug"],
           additionalProperties: false
         }
@@ -165,10 +187,10 @@ export function registerTools(server: Server, client: MarsClient): void {
         inputSchema: {
           type: "object",
           properties: {
-            slug: { type: "string" },
-            correctionsOnly: { type: "boolean" },
-            anyChangesSince: { type: "string" },
-            lastDays: { type: "number" }
+            slug: { type: "string", description: "MARS report slug from mars_list_reports." },
+            correctionsOnly: { type: "boolean", description: "When true, request only correction records." },
+            anyChangesSince: { type: "string", pattern: "^\\d{4}/\\d{2}/\\d{2}$", description: "Return records changed since this date in YYYY/MM/DD format." },
+            lastDays: { type: "number", minimum: 1, maximum: 3660, description: "Limit details to reports from the last N days." }
           },
           required: ["slug"],
           additionalProperties: false
@@ -179,7 +201,7 @@ export function registerTools(server: Server, client: MarsClient): void {
         description: "Fetch the report description and API documentation page",
         inputSchema: {
           type: "object",
-          properties: { slug: { type: "string" } },
+          properties: { slug: { type: "string", description: "MARS report slug from mars_list_reports." } },
           required: ["slug"],
           additionalProperties: false
         }
@@ -187,17 +209,17 @@ export function registerTools(server: Server, client: MarsClient): void {
       {
         name: "mars_list_offices",
         description: "List MARS offices",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+        inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       },
       {
         name: "mars_list_market_types",
         description: "List MARS market types",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+        inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       },
       {
         name: "mars_list_commodities",
         description: "List MARS commodities",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+        inputSchema: { type: "object", description: "No input is required.", properties: {}, additionalProperties: false }
       }
     ]
   }));
@@ -211,8 +233,7 @@ export function registerTools(server: Server, client: MarsClient): void {
         case "mars_healthcheck": {
           listReportsSchema.parse(args);
           const response = await client.getJson("/reports");
-          return toolResult({
-            ok: true,
+          return successResult({
             http_status: response.status,
             message: "MARS API reachable"
           });
@@ -220,7 +241,7 @@ export function registerTools(server: Server, client: MarsClient): void {
         case "mars_list_reports": {
           listReportsSchema.parse(args);
           const response = await client.getJson<Array<{ slug_id: string; slug_name: string; report_name: string }>>("/reports");
-          return toolResult({ results: response.data });
+          return successResult({ data: response.data, results: response.data });
         }
         case "mars_get_report": {
           const input = getReportSchema.parse(args);
@@ -229,20 +250,37 @@ export function registerTools(server: Server, client: MarsClient): void {
             sort: input.sort,
             allSections: input.allSections
           });
-          return toolResult({ slug: input.slug, data: response.data });
+          return successResult({ slug: input.slug, data: response.data });
         }
         case "mars_get_report_data": {
           const input = getReportDataSchema.parse(args);
-          const response = await client.getJson(
-            `/reports/${encodeURIComponent(input.slug)}/report%20details`,
-            {
-              q: input.q,
-              sort: input.sort,
-              allSections: input.allSections,
-              lastReports: input.lastReports
-            }
-          );
-          return toolResult({ slug: input.slug, data: response.data });
+          const endpoint = `/reports/${encodeURIComponent(input.slug)}/report%20details`;
+          const query = {
+            q: input.q,
+            sort: input.sort,
+            allSections: input.allSections,
+            lastReports: input.lastReports
+          };
+          const response = await client.getJson(endpoint, query);
+
+          if (!input.normalize) {
+            return successResult({ slug: input.slug, data: response.data });
+          }
+
+          const normalized = normalizeReportData(response.data, {
+            slug: input.slug,
+            endpoint,
+            query,
+            sort: input.sort,
+            includeRaw: input.includeRaw ?? true,
+            maxRows: input.maxRows
+          });
+
+          return successResult({
+            slug: input.slug,
+            data: normalized,
+            ...normalized
+          });
         }
         case "mars_get_report_section": {
           const input = getSectionSchema.parse(args);
@@ -250,14 +288,14 @@ export function registerTools(server: Server, client: MarsClient): void {
             `/reports/${encodeURIComponent(input.slug)}/${encodeURIComponent(input.section)}`,
             { q: input.q, sort: input.sort }
           );
-          return toolResult({ slug: input.slug, section: input.section, data: response.data });
+          return successResult({ slug: input.slug, section: input.section, data: response.data });
         }
         case "mars_get_report_columns": {
           const input = getColumnsSchema.parse(args);
           const response = await client.getJson(
             `/reports/${encodeURIComponent(input.slug)}/columns`
           );
-          return toolResult({ slug: input.slug, data: response.data });
+          return successResult({ slug: input.slug, data: response.data });
         }
         case "mars_get_report_details": {
           const input = getDetailsSchema.parse(args);
@@ -266,7 +304,7 @@ export function registerTools(server: Server, client: MarsClient): void {
             anyChangesSince: input.anyChangesSince,
             lastDays: input.lastDays
           });
-          return toolResult({ slug: input.slug, data: response.data });
+          return successResult({ slug: input.slug, data: response.data });
         }
         case "mars_get_report_info": {
           const input = getReportInfoSchema.parse(args);
@@ -278,7 +316,7 @@ export function registerTools(server: Server, client: MarsClient): void {
           const apiUrls = extractApiUrls(html);
           const text = stripHtml(html);
 
-          return toolResult({
+          return successResult({
             slug: input.slug,
             url,
             http_status: response.status,
@@ -291,23 +329,23 @@ export function registerTools(server: Server, client: MarsClient): void {
         case "mars_list_offices": {
           listReportsSchema.parse(args);
           const response = await client.getJson("/offices");
-          return toolResult(response.data);
+          return successResult({ data: response.data });
         }
         case "mars_list_market_types": {
           listReportsSchema.parse(args);
           const response = await client.getJson("/marketTypes");
-          return toolResult(response.data);
+          return successResult({ data: response.data });
         }
         case "mars_list_commodities": {
           listReportsSchema.parse(args);
           const response = await client.getJson("/commodities");
-          return toolResult(response.data);
+          return successResult({ data: response.data });
         }
         default:
-          return toolResult({ error_code: "unknown", message: `Unknown tool: ${tool}` }, true);
+          return errorResult({ error_code: "unknown", message: `Unknown tool: ${tool}` });
       }
     } catch (error) {
-      return toolResult(normalizeError(error), true);
+      return errorResult(normalizeError(error));
     }
   });
 }
