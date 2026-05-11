@@ -3,6 +3,7 @@ services:
     build: .
     environment:
       - MARS_API_KEY=${MARS_API_KEY}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - PORT=3333
     ports:
       - "3333:3333"

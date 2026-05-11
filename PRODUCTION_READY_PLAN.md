@@ -156,33 +156,37 @@ Current repo facts:
 
 ### 7. Observability And Operations
 
-- Replace plain string logs with simple structured JSON logs for HTTP mode.
-- Include request lifecycle logs:
+Status: In progress by Codex agent (this change set).
+
+- [x] Replace plain string logs with simple structured JSON logs for HTTP mode.
+- [x] Include request lifecycle logs:
   - request received
-  - tool name
   - duration
   - status/error code
-  - retry count if available
-- Avoid logging full arguments when they may contain sensitive data.
-- Add startup logs for:
+- [x] Avoid logging full arguments when they may contain sensitive data.
+- [x] Add startup logs for:
   - server version
   - mode
   - port
   - cache enabled/disabled
   - auth enabled/disabled
-- Add health checks:
+- [x] Add health checks:
   - `/healthz` process-level health.
   - `mars_healthcheck` USDA API reachability.
+
+Note: Tool-name and retry-count lifecycle logging remain future enhancements because the current MCP SDK transport owns request body parsing and the retry helper does not yet expose attempt counts.
 
 ## Implementation Order
 
 ### Phase 1: Baseline And Dependency Refresh
 
-- Install dependencies and commit or update lockfile if the project uses one.
-- Upgrade dependencies and fix TypeScript build breaks.
-- Refactor server creation into a shared factory.
-- Ensure `npm.cmd run build` and `npm.cmd test` work on Windows PowerShell environments.
-- Update README for install/build/test commands and all current tools.
+Status: In progress by Codex agent (this change set).
+
+- [ ] Install dependencies and commit or update lockfile if the project uses one.
+- [ ] Upgrade dependencies and fix TypeScript build breaks.
+- [x] Refactor server creation into a shared factory.
+- [x] Ensure `npm.cmd run build` and `npm.cmd test` work on Windows PowerShell environments.
+- [x] Update README for install/build/test commands and all current tools.
 
 Acceptance criteria:
 
@@ -193,11 +197,13 @@ Acceptance criteria:
 
 ### Phase 2: HTTP Production Hardening
 
-- Add HTTP path routing for `/mcp` and `/healthz`.
-- Add optional `MCP_AUTH_TOKEN` bearer auth for `/mcp`.
-- Add startup validation for `PORT` and MARS config.
-- Add graceful shutdown.
-- Update Docker/Railway docs.
+Status: In progress by Codex agent (this change set).
+
+- [x] Add HTTP path routing for `/mcp` and `/healthz`.
+- [x] Add optional `MCP_AUTH_TOKEN` bearer auth for `/mcp`.
+- [x] Add startup validation for `PORT` and MARS config.
+- [x] Add graceful shutdown.
+- [x] Update Docker/Railway docs.
 
 Acceptance criteria:
 
@@ -208,11 +214,13 @@ Acceptance criteria:
 
 ### Phase 3: Client Reliability And Testability
 
-- Consolidate `getJson` and `request` into one implementation path or make one delegate to the other.
-- Preserve injectable fetch/request behavior for tests.
-- Add retry coverage for transient HTTP and network failures.
-- Add config validation and sanitized errors.
-- Add optional TTL cache for discovery endpoints.
+Status: In progress by Codex agent (this change set).
+
+- [x] Consolidate `getJson` and `request` into one implementation path or make one delegate to the other.
+- [x] Preserve injectable fetch/request behavior for tests.
+- [x] Add retry coverage for transient HTTP and network failures.
+- [x] Add config validation and sanitized errors.
+- [x] Add optional TTL cache for discovery endpoints.
 
 Acceptance criteria:
 
@@ -222,11 +230,13 @@ Acceptance criteria:
 
 ### Phase 4: Tool Schema And Output Contract
 
-- Add schema descriptions and bounds.
-- Standardize success/error envelopes.
-- Add normalized report-data options to `mars_get_report_data`.
-- Implement conservative normalization helper.
-- Keep backward compatibility where practical by preserving existing `data` fields.
+Status: In progress by Codex agent (this change set).
+
+- [x] Add schema descriptions and bounds.
+- [x] Standardize success/error envelopes.
+- [x] Add normalized report-data options to `mars_get_report_data`.
+- [x] Implement conservative normalization helper.
+- [x] Keep backward compatibility where practical by preserving existing `data` fields.
 
 Acceptance criteria:
 
@@ -237,10 +247,12 @@ Acceptance criteria:
 
 ### Phase 5: Skill Authoring Assets
 
-- Add `docs/SKILL_AUTHORING.md`.
-- Add one example report-specific skill guide or template.
-- Include examples showing exact MCP calls and expected response handling.
-- Update README to point skill authors to the guide.
+Status: In progress by Codex agent (this change set).
+
+- [x] Add `docs/SKILL_AUTHORING.md`.
+- [x] Add one example report-specific skill guide or template.
+- [x] Include examples showing exact MCP calls and expected response handling.
+- [x] Update README to point skill authors to the guide.
 
 Acceptance criteria:
 

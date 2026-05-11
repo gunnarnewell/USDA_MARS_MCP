@@ -1,9 +1,7 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./util/config.js";
 import { logger } from "./util/logger.js";
-import { MarsClient } from "./mars/client.js";
-import { registerTools } from "./mcp/tools.js";
+import { createMarsMcpServer } from "./mcp/server.js";
 
 async function main() {
   const config = await loadConfig();
@@ -12,20 +10,7 @@ async function main() {
     process.exit(1);
   }
 
-  const server = new Server(
-    {
-      name: "mars-mcp-server",
-      version: "0.1.0"
-    },
-    {
-      capabilities: {
-        tools: {}
-      }
-    }
-  );
-
-  const client = new MarsClient(config.apiKey);
-  registerTools(server, client);
+  const server = createMarsMcpServer(config);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
